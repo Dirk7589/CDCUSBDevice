@@ -13,7 +13,7 @@
 
 /**Defines*/
 #define USE_AND_OR
-
+#define DEBUG 1
 /** INCLUDES *******************************************************/
 #include "./USB/usb.h"
 #include "./USB/usb_function_cdc.h"
@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include "HardwareProfile.h"
 #include "adc.h"
+#include "rotary.h"
 
 /**Configuration Bits*/
 #if defined(__PIC24FJ64GB002__)
@@ -39,10 +40,11 @@
 /** Global Variables ********************************************************/
 char USB_In_Buffer[64];
 char USB_Out_Buffer[64];
-
+struct rotaryHardwareState encoder1;
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void ProcessIO(void);
+void initADC(UINT port);
 void useADC(UINT *buffer, UINT port);
 void USBDeviceTasks(void);
 void YourHighPriorityISRCode();
@@ -143,16 +145,52 @@ static void InitializeSystem(void)
  */
 void UserInit(void)
 {
-    TRISAbits.TRISA1 = INPUT_PIN;   //Setup inputs
+    TRISBbits.TRISB7 = INPUT_PIN;
+    TRISBbits.TRISB8 = INPUT_PIN;
+    TRISBbits.TRISB9 = INPUT_PIN;
 
+    CNPU2bits.CN21PUE = 1;
+    CNPU2bits.CN22PUE = 1;
+    CNPU2bits.CN23PUE = 1;
     
     int i;
     for(i=0; i<64; i++)
     {
         USB_In_Buffer[i] = 0;
     }
+    initRotaryStruct(&encoder1);
 }
 
+/**
+ * @brief A function that configures the TRI-state registers for the ADC.
+ * @param port Specifies the analogue port to be used
+ */
+void initADC(UINT port)
+{
+    switch(port)
+    {
+        case 0:
+            TRISAbits.TRISA0 = INPUT_PIN;
+            break;
+        case 1:
+            TRISAbits.TRISA1 = INPUT_PIN;
+            break;
+        case 2:
+            TRISBbits.TRISB0 = INPUT_PIN;
+            break;
+        case 3:
+            TRISBbits.TRISB1 = INPUT_PIN;
+            break;
+        case 4:
+            TRISBbits.TRISB2 = INPUT_PIN;
+            break;
+        case 5:
+            TRISBbits.TRISB3 = INPUT_PIN;
+            break;
+        default:
+            break;
+    }
+}
 /**
  * @brief A function that parses the user I/O and interfaces with the USB USART
  * @retval None
@@ -161,12 +199,17 @@ void ProcessIO(void)
 {   
     BYTE numBytesRead;
     UINT ADCResult[16];
+
+    #if !DEBUG
     useADC(ADCResult, 0);
 
     sprintf(USB_In_Buffer, "%d\n\r", ADCResult[0]);
+    #endif
 
-    
-    
+    #if DEBUG
+    readRotary(&encoder1);
+    sprintf(USB_In_Buffer, "%d\n\r", encoder1.direction);
+    #endif
     // User Application USB tasks
     if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1))
     {
@@ -193,6 +236,11 @@ void useADC(UINT *buffer, UINT port)
 
    CloseADC10();
 
+   if(sizeof(buffer) != 16 )
+   {
+       return;
+   }
+   
    switch(port)
    {
        case 0:
