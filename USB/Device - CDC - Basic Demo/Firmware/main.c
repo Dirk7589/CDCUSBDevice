@@ -55,6 +55,8 @@
 #include "adc.h"
 #include "HardwareProfile.h"
 
+#define USE_AND_OR
+
 /** CONFIGURATION **************************************************/
 #if defined(PICDEM_FS_USB)      // Configuration bits for PICDEM FS USB Demo Board (based on PIC18F4550)
         #pragma config PLLDIV   = 5         // (20 MHz crystal on PICDEM FS USB board)
@@ -787,10 +789,16 @@ void UserInit(void)
     AD1PCFGLbits.PCFG5 = 1; //Select AN5 for ADC
     UINT channel,config1,config2,config3,configport,configscan;
 
+    ConfigIntADC10(ADC_INT_DISABLE);
+
     CloseADC10();
+
     channel= ADC_CH0_POS_SAMPLEA_AN5;
+
+    SetChanADC10(channel);
+
     config1 = ADC_MODULE_OFF | ADC_CLK_AUTO |ADC_AUTO_SAMPLING_ON ;
-    config2 = ADC_SCAN_ON | ADC_INTR_EACH_CONV ;
+    config2 = ADC_SCAN_ON | ADC_INTR_EACH_CONV | ADC_VREF_AVDD_AVSS ;
     config3 = ADC_SAMPLE_TIME_17 | ADC_CONV_CLK_254Tcy;
     configport = 0x0005;
     configscan = ADC_SCAN_AN5 ;
@@ -801,8 +809,7 @@ void UserInit(void)
     {
         USB_In_Buffer[i] = 0;
     }
-
-    ConfigIntADC10(ADC_INT_DISABLE);
+    
 }//end UserInit
 
 /********************************************************************
@@ -828,8 +835,8 @@ void ProcessIO(void)
     UINT ADCResult[16];
     char value = 0;
     int i = 0;
-    USB_In_Buffer[1]= 't';
-    USB_In_Buffer[2]= 'e';
+    //USB_In_Buffer[1]= 't';
+    //USB_In_Buffer[2]= 'e';
     EnableADC1;
 
     for(i= 0; i<16; i++)
@@ -838,12 +845,12 @@ void ProcessIO(void)
        while(BusySampADC1); /*wait till conversion complete*/
        ADCResult[i] = ReadADC10(i);
     }
-   // itoa(&value,ADCResult[0],10);
-   /// USB_In_Buffer[0] = value;
-    //itoa(&value, ADCResult[0],10);
-    USB_In_Buffer[0] = value;
+    CloseADC10();
+
+    USB_In_Buffer[0] = (char)(ADCResult[0] + 48);
     // User Application USB tasks
-    if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1)){
+    if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1))
+    {
         return;
     }
 
