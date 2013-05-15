@@ -9,497 +9,52 @@
  Complier:      Microchip C18 (for PIC18), XC16 (for PIC24/dsPIC), XC32 (for PIC32)
  Company:       Microchip Technology, Inc.
 
- Software License Agreement:
+*/
 
- The software supplied herewith by Microchip Technology Incorporated
- (the "Company") for its PIC� Microcontroller is intended and
- supplied to you, the Company's customer, for use solely and
- exclusively on Microchip PIC Microcontroller products. The
- software is owned by the Company and/or its supplier, and is
- protected under applicable copyright laws. All rights are reserved.
- Any use in violation of the foregoing restrictions may subject the
- user to criminal sanctions under applicable laws, as well as to
- civil liability for the breach of the terms and conditions of this
- license.
-
- THIS SOFTWARE IS PROVIDED IN AN "AS IS" CONDITION. NO WARRANTIES,
- WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED
- TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
- PARTICULAR PURPOSE APPLY TO THIS SOFTWARE. THE COMPANY SHALL NOT,
- IN ANY CIRCUMSTANCES, BE LIABLE FOR SPECIAL, INCIDENTAL OR
- CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
-
-********************************************************************
- File Description:
-
- Change History:
-  Rev   Description
-  ----  -----------------------------------------
-  1.0   Initial release
-
-  2.1   Updated for simplicity and to use common
-        coding style
-
-  2.6a  Added button debouncing using Start-of-Frame packets
-
-  2.7   Updated demo to place the PIC24F devices into sleep when the
-        USB is in suspend.  
-
-  2.7b  Improvements to USBCBSendResume(), to make it easier to use.
-  2.9f  Adding new part support
-********************************************************************/
+/**Defines*/
+#define USE_AND_OR
 
 /** INCLUDES *******************************************************/
 #include "./USB/usb.h"
 #include "./USB/usb_function_cdc.h"
-#include "adc.h"
-#include "HardwareProfile.h"
-
-#define USE_AND_OR
-
-/** CONFIGURATION **************************************************/
-#if defined(PICDEM_FS_USB)      // Configuration bits for PICDEM FS USB Demo Board (based on PIC18F4550)
-        #pragma config PLLDIV   = 5         // (20 MHz crystal on PICDEM FS USB board)
-        #if (USB_SPEED_OPTION == USB_FULL_SPEED)
-            #pragma config CPUDIV   = OSC1_PLL2  
-        #else
-            #pragma config CPUDIV   = OSC3_PLL4   
-        #endif
-        #pragma config USBDIV   = 2         // Clock source from 96MHz PLL/2
-        #pragma config FOSC     = HSPLL_HS
-        #pragma config FCMEN    = OFF
-        #pragma config IESO     = OFF
-        #pragma config PWRT     = OFF
-        #pragma config BOR      = ON
-        #pragma config BORV     = 3
-        #pragma config VREGEN   = ON      //USB Voltage Regulator
-        #pragma config WDT      = OFF
-        #pragma config WDTPS    = 32768
-        #pragma config MCLRE    = ON
-        #pragma config LPT1OSC  = OFF
-        #pragma config PBADEN   = OFF
-//      #pragma config CCP2MX   = ON
-        #pragma config STVREN   = ON
-        #pragma config LVP      = OFF
-//      #pragma config ICPRT    = OFF       // Dedicated In-Circuit Debug/Programming
-        #pragma config XINST    = OFF       // Extended Instruction Set
-        #pragma config CP0      = OFF
-        #pragma config CP1      = OFF
-//      #pragma config CP2      = OFF
-//      #pragma config CP3      = OFF
-        #pragma config CPB      = OFF
-//      #pragma config CPD      = OFF
-        #pragma config WRT0     = OFF
-        #pragma config WRT1     = OFF
-//      #pragma config WRT2     = OFF
-//      #pragma config WRT3     = OFF
-        #pragma config WRTB     = OFF       // Boot Block Write Protection
-        #pragma config WRTC     = OFF
-//      #pragma config WRTD     = OFF
-        #pragma config EBTR0    = OFF
-        #pragma config EBTR1    = OFF
-//      #pragma config EBTR2    = OFF
-//      #pragma config EBTR3    = OFF
-        #pragma config EBTRB    = OFF
-
-#elif defined(PICDEM_FS_USB_K50)
-        #pragma config PLLSEL   = PLL3X     // 3X PLL multiplier selected
-        #pragma config CFGPLLEN = OFF       // PLL turned on during execution
-        #pragma config CPUDIV   = NOCLKDIV  // 1:1 mode (for 48MHz CPU)
-        #pragma config LS48MHZ  = SYS48X8   // Clock div / 8 in Low Speed USB mode
-        #pragma config FOSC     = INTOSCIO  // HFINTOSC selected at powerup, no clock out
-        #pragma config PCLKEN   = OFF       // Primary oscillator driver
-        #pragma config FCMEN    = OFF       // Fail safe clock monitor
-        #pragma config IESO     = OFF       // Internal/external switchover (two speed startup)
-        #pragma config nPWRTEN  = OFF       // Power up timer
-        #pragma config BOREN    = SBORDIS   // BOR enabled
-        #pragma config nLPBOR   = ON        // Low Power BOR
-        #pragma config WDTEN    = SWON      // Watchdog Timer controlled by SWDTEN
-        #pragma config WDTPS    = 32768     // WDT postscalar
-        #pragma config PBADEN   = OFF       // Port B Digital/Analog Powerup Behavior
-        #pragma config SDOMX    = RC7       // SDO function location
-        #pragma config LVP      = OFF       // Low voltage programming
-        #pragma config MCLRE    = ON        // MCLR function enabled (RE3 disabled)
-        #pragma config STVREN   = ON        // Stack overflow reset
-        //#pragma config ICPRT  = OFF       // Dedicated ICPORT program/debug pins enable
-        #pragma config XINST    = OFF       // Extended instruction set
-
-#elif defined(PIC18F87J50_PIM)				// Configuration bits for PIC18F87J50 FS USB Plug-In Module board
-        #pragma config XINST    = OFF   	// Extended instruction set
-        #pragma config STVREN   = ON      	// Stack overflow reset
-        #pragma config PLLDIV   = 3         // (12 MHz crystal used on this board)
-        #pragma config WDTEN    = OFF      	// Watch Dog Timer (WDT)
-        #pragma config CP0      = OFF      	// Code protect
-        #pragma config CPUDIV   = OSC1      // OSC1 = divide by 1 mode
-        #pragma config IESO     = OFF      	// Internal External (clock) Switchover
-        #pragma config FCMEN    = OFF      	// Fail Safe Clock Monitor
-        #pragma config FOSC     = HSPLL     // Firmware must also set OSCTUNE<PLLEN> to start PLL!
-        #pragma config WDTPS    = 32768
-//      #pragma config WAIT     = OFF      	// Commented choices are
-//      #pragma config BW       = 16      	// only available on the
-//      #pragma config MODE     = MM      	// 80 pin devices in the 
-//      #pragma config EASHFT   = OFF      	// family.
-        #pragma config MSSPMSK  = MSK5
-//      #pragma config PMPMX    = DEFAULT
-//      #pragma config ECCPMX   = DEFAULT
-        #pragma config CCP2MX   = DEFAULT   
-        
-// Configuration bits for PIC18F97J94 PIM and PIC18F87J94 PIM
-#elif defined(PIC18F97J94_PIM) || defined(PIC18F87J94_PIM)
-        #pragma config STVREN   = ON      	// Stack overflow reset
-        #pragma config XINST    = OFF   	// Extended instruction set
-        #pragma config BOREN    = ON        // BOR Enabled
-        #pragma config BORV     = 0         // BOR Set to "2.0V" nominal setting
-        #pragma config CP0      = OFF      	// Code protect disabled
-        #pragma config FOSC     = FRCPLL    // Firmware should also enable active clock tuning for this setting
-        #pragma config SOSCSEL  = LOW       // SOSC circuit configured for crystal driver mode
-        #pragma config CLKOEN   = OFF       // Disable clock output on RA6
-        #pragma config IESO     = OFF      	// Internal External (clock) Switchover
-        #pragma config PLLDIV   = NODIV     // 4 MHz input (from 8MHz FRC / 2) provided to PLL circuit
-        #pragma config POSCMD   = NONE      // Primary osc disabled, using FRC
-        #pragma config FSCM     = CSECMD    // Clock switching enabled, fail safe clock monitor disabled
-        #pragma config WPDIS    = WPDIS     // Program memory not write protected
-        #pragma config WPCFG    = WPCFGDIS  // Config word page of program memory not write protected
-        #pragma config IOL1WAY  = OFF       // IOLOCK can be set/cleared as needed with unlock sequence
-        #pragma config LS48MHZ  = SYSX2     // Low Speed USB clock divider
-        #pragma config WDTCLK   = LPRC      // WDT always uses INTOSC/LPRC oscillator
-        #pragma config WDTEN    = ON        // WDT disabled; SWDTEN can control WDT
-        #pragma config WINDIS   = WDTSTD    // Normal non-window mode WDT.
-        #pragma config VBTBOR   = OFF       // VBAT BOR disabled
-      
-#elif defined(PIC18F46J50_PIM) || defined(PIC18F_STARTER_KIT_1) || defined(PIC18F47J53_PIM)
-     #pragma config WDTEN = OFF          //WDT disabled (enabled by SWDTEN bit)
-     #pragma config PLLDIV = 3           //Divide by 3 (12 MHz oscillator input)
-     #pragma config STVREN = ON          //stack overflow/underflow reset enabled
-     #pragma config XINST = OFF          //Extended instruction set disabled
-     #pragma config CPUDIV = OSC1        //No CPU system clock divide
-     #pragma config CP0 = OFF            //Program memory is not code-protected
-     #pragma config OSC = HSPLL          //HS oscillator, PLL enabled, HSPLL used by USB
-     //#pragma config T1DIG = ON           //Sec Osc clock source may be selected
-     //#pragma config LPT1OSC = OFF        //high power Timer1 mode
-     #pragma config FCMEN = OFF          //Fail-Safe Clock Monitor disabled
-     #pragma config IESO = OFF           //Two-Speed Start-up disabled
-     #pragma config WDTPS = 32768        //1:32768
-     #pragma config DSWDTOSC = INTOSCREF //DSWDT uses INTOSC/INTRC as clock
-     #pragma config RTCOSC = T1OSCREF    //RTCC uses T1OSC/T1CKI as clock
-     #pragma config DSBOREN = OFF        //Zero-Power BOR disabled in Deep Sleep
-     #pragma config DSWDTEN = OFF        //Disabled
-     #pragma config DSWDTPS = 8192       //1:8,192 (8.5 seconds)
-     #pragma config IOL1WAY = OFF        //IOLOCK bit can be set and cleared
-     #pragma config MSSP7B_EN = MSK7     //7 Bit address masking
-     #pragma config WPFP = PAGE_1        //Write Protect Program Flash Page 0
-     #pragma config WPEND = PAGE_0       //Start protection at page 0
-     #pragma config WPCFG = OFF          //Write/Erase last page protect Disabled
-     #pragma config WPDIS = OFF          //WPFP[5:0], WPEND, and WPCFG bits ignored  
-#elif defined(LOW_PIN_COUNT_USB_DEVELOPMENT_KIT)
-        #pragma config CPUDIV = NOCLKDIV
-        #pragma config USBDIV = OFF
-        #pragma config FOSC   = HS
-        #pragma config PLLEN  = ON
-        #pragma config FCMEN  = OFF
-        #pragma config IESO   = OFF
-        #pragma config PWRTEN = OFF
-        #pragma config BOREN  = OFF
-        #pragma config BORV   = 30
-        #pragma config WDTEN  = OFF
-        #pragma config WDTPS  = 32768
-        #pragma config MCLRE  = OFF
-        #pragma config HFOFST = OFF
-        #pragma config STVREN = ON
-        #pragma config LVP    = OFF
-        #pragma config XINST  = OFF
-        #pragma config BBSIZ  = OFF
-        #pragma config CP0    = OFF
-        #pragma config CP1    = OFF
-        #pragma config CPB    = OFF
-        #pragma config WRT0   = OFF
-        #pragma config WRT1   = OFF
-        #pragma config WRTB   = OFF
-        #pragma config WRTC   = OFF
-        #pragma config EBTR0  = OFF
-        #pragma config EBTR1  = OFF
-        #pragma config EBTRB  = OFF       
-
-#elif	defined(PIC16F1_LPC_USB_DEVELOPMENT_KIT)
-    // PIC 16F1459 fuse configuration:
-    // Config word 1 (Oscillator configuration)
-    // 20Mhz crystal input scaled to 48Mhz and configured for USB operation
-    #if defined (USE_INTERNAL_OSC)
-        __CONFIG(FOSC_INTOSC & WDTE_OFF & PWRTE_OFF & MCLRE_OFF & CP_OFF & BOREN_OFF & CLKOUTEN_ON & IESO_OFF & FCMEN_OFF);
-        __CONFIG(WRT_OFF & CPUDIV_NOCLKDIV & USBLSCLK_48MHz & PLLMULT_3x & PLLEN_ENABLED & STVREN_ON &  BORV_LO & LPBOR_OFF & LVP_OFF);
-    #else
-        __CONFIG(FOSC_HS & WDTE_OFF & PWRTE_OFF & MCLRE_OFF & CP_OFF & BOREN_OFF & CLKOUTEN_ON & IESO_OFF & FCMEN_OFF);
-        __CONFIG(WRT_OFF & CPUDIV_NOCLKDIV & USBLSCLK_48MHz & PLLMULT_4x & PLLEN_ENABLED & STVREN_ON &  BORV_LO & LPBOR_OFF & LVP_OFF);
-    #endif
-
-#elif defined(EXPLORER_16)
-    #if defined(__PIC24FJ256GB110__)
-        _CONFIG1( JTAGEN_OFF & GCP_OFF & GWRP_OFF & FWDTEN_OFF & ICS_PGx2) 
-        _CONFIG2( PLL_96MHZ_ON & IESO_OFF & FCKSM_CSDCMD & OSCIOFNC_ON & POSCMOD_HS & FNOSC_PRIPLL & PLLDIV_DIV2 & IOL1WAY_ON)
-    #elif defined(__PIC24FJ256GB210__)
-        _CONFIG1(FWDTEN_OFF & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF)
-        _CONFIG2(POSCMOD_HS & IOL1WAY_ON & OSCIOFNC_ON & FCKSM_CSDCMD & FNOSC_PRIPLL & PLL96MHZ_ON & PLLDIV_DIV2 & IESO_OFF)
-    #elif defined(__PIC24FJ64GB002__)
-        _CONFIG1(WDTPS_PS1 & FWPSA_PR32 & WINDIS_OFF & FWDTEN_OFF & ICS_PGx1 & GWRP_OFF & GCP_OFF & JTAGEN_OFF)
-        _CONFIG2(POSCMOD_NONE & I2C1SEL_PRI & IOL1WAY_OFF & OSCIOFNC_ON & FCKSM_CSDCMD & FNOSC_FRCPLL & PLL96MHZ_ON & PLLDIV_NODIV & IESO_OFF)
-        _CONFIG3(WPFP_WPFP0 & SOSCSEL_SOSC & WUTSEL_LEG & WPDIS_WPDIS & WPCFG_WPCFGDIS & WPEND_WPENDMEM)
-        _CONFIG4(DSWDTPS_DSWDTPS3 & DSWDTOSC_LPRC & RTCOSC_SOSC & DSBOREN_OFF & DSWDTEN_OFF)
-    #elif defined(__32MX460F512L__) || defined(__32MX795F512L__)
-        #pragma config UPLLEN   = ON        // USB PLL Enabled
-        #pragma config FPLLMUL  = MUL_15        // PLL Multiplier
-        #pragma config UPLLIDIV = DIV_2         // USB PLL Input Divider
-        #pragma config FPLLIDIV = DIV_2         // PLL Input Divider
-        #pragma config FPLLODIV = DIV_1         // PLL Output Divider
-        #pragma config FPBDIV   = DIV_1         // Peripheral Clock divisor
-        #pragma config FWDTEN   = OFF           // Watchdog Timer
-        #pragma config WDTPS    = PS1           // Watchdog Timer Postscale
-        #pragma config FCKSM    = CSDCMD        // Clock Switching & Fail Safe Clock Monitor
-        #pragma config OSCIOFNC = OFF           // CLKO Enable
-        #pragma config POSCMOD  = HS            // Primary Oscillator
-        #pragma config IESO     = OFF           // Internal/External Switch-over
-        #pragma config FSOSCEN  = OFF           // Secondary Oscillator Enable (KLO was off)
-        #pragma config FNOSC    = PRIPLL        // Oscillator Selection
-        #pragma config CP       = OFF           // Code Protect
-        #pragma config BWP      = OFF           // Boot Flash Write Protect
-        #pragma config PWP      = OFF           // Program Flash Write Protect
-        #pragma config ICESEL   = ICS_PGx2      // ICE/ICD Comm Channel Select
-    #elif defined(__dsPIC33EP512MU810__)|| defined(__PIC24EP512GU810__)
-        _FOSCSEL(FNOSC_FRC);
-        _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_XT);
-        _FWDT(FWDTEN_OFF);
-    #else
-        #error No hardware board defined, see "HardwareProfile.h" and __FILE__
-    #endif
-#elif defined(PIC24F_STARTER_KIT)
-    _CONFIG1( JTAGEN_OFF & GCP_OFF & GWRP_OFF & FWDTEN_OFF & ICS_PGx2) 
-    _CONFIG2( PLL_96MHZ_ON & IESO_OFF & FCKSM_CSDCMD & OSCIOFNC_ON & POSCMOD_HS & FNOSC_PRIPLL & PLLDIV_DIV3 & IOL1WAY_ON)
-#elif defined(PIC24FJ256DA210_DEV_BOARD)
-    _CONFIG1(FWDTEN_OFF & ICS_PGx2 & GWRP_OFF & GCP_OFF & JTAGEN_OFF)
-    _CONFIG2(POSCMOD_HS & IOL1WAY_ON & OSCIOFNC_ON & FCKSM_CSDCMD & FNOSC_PRIPLL & PLL96MHZ_ON & PLLDIV_DIV2 & IESO_OFF)
-#elif defined(PIC32_USB_STARTER_KIT)
-    #pragma config UPLLEN   = ON        // USB PLL Enabled
-    #pragma config FPLLMUL  = MUL_15        // PLL Multiplier
-    #pragma config UPLLIDIV = DIV_2         // USB PLL Input Divider
-    #pragma config FPLLIDIV = DIV_2         // PLL Input Divider
-    #pragma config FPLLODIV = DIV_1         // PLL Output Divider
-    #pragma config FPBDIV   = DIV_1         // Peripheral Clock divisor
-    #pragma config FWDTEN   = OFF           // Watchdog Timer
-    #pragma config WDTPS    = PS1           // Watchdog Timer Postscale
-    #pragma config FCKSM    = CSDCMD        // Clock Switching & Fail Safe Clock Monitor
-    #pragma config OSCIOFNC = OFF           // CLKO Enable
-    #pragma config POSCMOD  = HS            // Primary Oscillator
-    #pragma config IESO     = OFF           // Internal/External Switch-over
-    #pragma config FSOSCEN  = OFF           // Secondary Oscillator Enable (KLO was off)
-    #pragma config FNOSC    = PRIPLL        // Oscillator Selection
-    #pragma config CP       = OFF           // Code Protect
-    #pragma config BWP      = OFF           // Boot Flash Write Protect
-    #pragma config PWP      = OFF           // Program Flash Write Protect
-    #pragma config ICESEL   = ICS_PGx2      // ICE/ICD Comm Channel Select
-#elif defined(DSPIC33E_USB_STARTER_KIT)
-    _FOSCSEL(FNOSC_FRC);
-    _FOSC(FCKSM_CSECMD & OSCIOFNC_OFF & POSCMD_XT);
-    _FWDT(FWDTEN_OFF);
-#elif defined(PIC24FJ64GB502_MICROSTICK)
-    _CONFIG1(WDTPS_PS1 & FWPSA_PR32 & WINDIS_OFF & FWDTEN_OFF & ICS_PGx1 & GWRP_OFF & GCP_OFF & JTAGEN_OFF)
-    _CONFIG2(I2C1SEL_PRI & IOL1WAY_OFF & FCKSM_CSDCMD & FNOSC_PRIPLL & PLL96MHZ_ON & PLLDIV_DIV2 & IESO_OFF)
-    _CONFIG3(WPFP_WPFP0 & SOSCSEL_SOSC & WUTSEL_LEG & WPDIS_WPDIS & WPCFG_WPCFGDIS & WPEND_WPENDMEM)
-    _CONFIG4(DSWDTPS_DSWDTPS3 & DSWDTOSC_LPRC & RTCOSC_SOSC & DSBOREN_OFF & DSWDTEN_OFF)
-#else
-    #error No hardware board defined, see "HardwareProfile.h" and __FILE__
-#endif
-
-/** I N C L U D E S **********************************************************/
-
 #include "GenericTypeDefs.h"
 #include "Compiler.h"
 #include "usb_config.h"
 #include "USB/usb_device.h"
 #include "USB/usb.h"
-#include <stdlib.h>
+#include <stdio.h>
 #include "HardwareProfile.h"
+#include "adc.h"
 
-/** V A R I A B L E S ********************************************************/
+/**Configuration Bits*/
+#if defined(__PIC24FJ64GB002__)
+        _CONFIG1(WDTPS_PS1 & FWPSA_PR32 & WINDIS_OFF & FWDTEN_OFF & ICS_PGx1 & GWRP_OFF & GCP_OFF & JTAGEN_OFF)
+        _CONFIG2(POSCMOD_NONE & I2C1SEL_PRI & IOL1WAY_OFF & OSCIOFNC_ON & FCKSM_CSDCMD & FNOSC_FRCPLL & PLL96MHZ_ON & PLLDIV_NODIV & IESO_OFF)
+        _CONFIG3(WPFP_WPFP0 & SOSCSEL_SOSC & WUTSEL_LEG & WPDIS_WPDIS & WPCFG_WPCFGDIS & WPEND_WPENDMEM)
+        _CONFIG4(DSWDTPS_DSWDTPS3 & DSWDTOSC_LPRC & RTCOSC_SOSC & DSBOREN_OFF & DSWDTEN_OFF)
+
+#else
+    #error No hardware board defined, see "HardwareProfile.h" and __FILE__
+#endif
+/** Global Variables ********************************************************/
 char USB_In_Buffer[64];
 char USB_Out_Buffer[64];
-
 
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void ProcessIO(void);
+void useADC(UINT *buffer, UINT port);
 void USBDeviceTasks(void);
 void YourHighPriorityISRCode();
 void YourLowPriorityISRCode();
 void USBCBSendResume(void);
 void UserInit(void);
 
-/** VECTOR REMAPPING ***********************************************/
-#if defined(__18CXX)
-	//On PIC18 devices, addresses 0x00, 0x08, and 0x18 are used for
-	//the reset, high priority interrupt, and low priority interrupt
-	//vectors.  However, the current Microchip USB bootloader 
-	//examples are intended to occupy addresses 0x00-0x7FF or
-	//0x00-0xFFF depending on which bootloader is used.  Therefore,
-	//the bootloader code remaps these vectors to new locations
-	//as indicated below.  This remapping is only necessary if you
-	//wish to program the hex file generated from this project with
-	//the USB bootloader.  If no bootloader is used, edit the
-	//usb_config.h file and comment out the following defines:
-	//#define PROGRAMMABLE_WITH_USB_HID_BOOTLOADER
-	//#define PROGRAMMABLE_WITH_USB_LEGACY_CUSTOM_CLASS_BOOTLOADER
-	
-	#if defined(PROGRAMMABLE_WITH_USB_HID_BOOTLOADER)
-		#define REMAPPED_RESET_VECTOR_ADDRESS			0x1000
-		#define REMAPPED_HIGH_INTERRUPT_VECTOR_ADDRESS	0x1008
-		#define REMAPPED_LOW_INTERRUPT_VECTOR_ADDRESS	0x1018
-	#elif defined(PROGRAMMABLE_WITH_USB_MCHPUSB_BOOTLOADER)	
-		#define REMAPPED_RESET_VECTOR_ADDRESS			0x800
-		#define REMAPPED_HIGH_INTERRUPT_VECTOR_ADDRESS	0x808
-		#define REMAPPED_LOW_INTERRUPT_VECTOR_ADDRESS	0x818
-	#else	
-		#define REMAPPED_RESET_VECTOR_ADDRESS			0x00
-		#define REMAPPED_HIGH_INTERRUPT_VECTOR_ADDRESS	0x08
-		#define REMAPPED_LOW_INTERRUPT_VECTOR_ADDRESS	0x18
-	#endif
-	
-	#if defined(PROGRAMMABLE_WITH_USB_HID_BOOTLOADER)||defined(PROGRAMMABLE_WITH_USB_MCHPUSB_BOOTLOADER)
-	extern void _startup (void);        // See c018i.c in your C18 compiler dir
-	#pragma code REMAPPED_RESET_VECTOR = REMAPPED_RESET_VECTOR_ADDRESS
-	void _reset (void)
-	{
-	    _asm goto _startup _endasm
-	}
-	#endif
-	#pragma code REMAPPED_HIGH_INTERRUPT_VECTOR = REMAPPED_HIGH_INTERRUPT_VECTOR_ADDRESS
-	void Remapped_High_ISR (void)
-	{
-	     _asm goto YourHighPriorityISRCode _endasm
-	}
-	#pragma code REMAPPED_LOW_INTERRUPT_VECTOR = REMAPPED_LOW_INTERRUPT_VECTOR_ADDRESS
-	void Remapped_Low_ISR (void)
-	{
-	     _asm goto YourLowPriorityISRCode _endasm
-	}
-	
-	#if defined(PROGRAMMABLE_WITH_USB_HID_BOOTLOADER)||defined(PROGRAMMABLE_WITH_USB_MCHPUSB_BOOTLOADER)
-	//Note: If this project is built while one of the bootloaders has
-	//been defined, but then the output hex file is not programmed with
-	//the bootloader, addresses 0x08 and 0x18 would end up programmed with 0xFFFF.
-	//As a result, if an actual interrupt was enabled and occured, the PC would jump
-	//to 0x08 (or 0x18) and would begin executing "0xFFFF" (unprogrammed space).  This
-	//executes as nop instructions, but the PC would eventually reach the REMAPPED_RESET_VECTOR_ADDRESS
-	//(0x1000 or 0x800, depending upon bootloader), and would execute the "goto _startup".  This
-	//would effective reset the application.
-	
-	//To fix this situation, we should always deliberately place a 
-	//"goto REMAPPED_HIGH_INTERRUPT_VECTOR_ADDRESS" at address 0x08, and a
-	//"goto REMAPPED_LOW_INTERRUPT_VECTOR_ADDRESS" at address 0x18.  When the output
-	//hex file of this project is programmed with the bootloader, these sections do not
-	//get bootloaded (as they overlap the bootloader space).  If the output hex file is not
-	//programmed using the bootloader, then the below goto instructions do get programmed,
-	//and the hex file still works like normal.  The below section is only required to fix this
-	//scenario.
-	#pragma code HIGH_INTERRUPT_VECTOR = 0x08
-	void High_ISR (void)
-	{
-	     _asm goto REMAPPED_HIGH_INTERRUPT_VECTOR_ADDRESS _endasm
-	}
-	#pragma code LOW_INTERRUPT_VECTOR = 0x18
-	void Low_ISR (void)
-	{
-	     _asm goto REMAPPED_LOW_INTERRUPT_VECTOR_ADDRESS _endasm
-	}
-	#endif	//end of "#if defined(PROGRAMMABLE_WITH_USB_HID_BOOTLOADER)||defined(PROGRAMMABLE_WITH_USB_LEGACY_CUSTOM_CLASS_BOOTLOADER)"
-
-	#pragma code
-	
-	
-	//These are your actual interrupt handling routines.
-	#pragma interrupt YourHighPriorityISRCode
-	void YourHighPriorityISRCode()
-	{
-		//Check which interrupt flag caused the interrupt.
-		//Service the interrupt
-		//Clear the interrupt flag
-		//Etc.
-        #if defined(USB_INTERRUPT)
-	        USBDeviceTasks();
-        #endif
-	
-	}	//This return will be a "retfie fast", since this is in a #pragma interrupt section 
-	#pragma interruptlow YourLowPriorityISRCode
-	void YourLowPriorityISRCode()
-	{
-		//Check which interrupt flag caused the interrupt.
-		//Service the interrupt
-		//Clear the interrupt flag
-		//Etc.
-	
-	}	//This return will be a "retfie", since this is in a #pragma interruptlow section 
-
-#elif defined(__C30__) || defined __XC16__
-    #if defined(PROGRAMMABLE_WITH_USB_HID_BOOTLOADER)
-        /*
-         *	ISR JUMP TABLE
-         *
-         *	It is necessary to define jump table as a function because C30 will
-         *	not store 24-bit wide values in program memory as variables.
-         *
-         *	This function should be stored at an address where the goto instructions 
-         *	line up with the remapped vectors from the bootloader's linker script.
-         *  
-         *  For more information about how to remap the interrupt vectors,
-         *  please refer to AN1157.  An example is provided below for the T2
-         *  interrupt with a bootloader ending at address 0x1400
-         */
-//        void __attribute__ ((address(0x1404))) ISRTable(){
-//        
-//        	asm("reset"); //reset instruction to prevent runaway code
-//        	asm("goto %0"::"i"(&_T2Interrupt));  //T2Interrupt's address
-//        }
-    #endif
-#elif defined(_PIC14E)
-    	//These are your actual interrupt handling routines.
-	void interrupt ISRCode()
-	{
-		//Check which interrupt flag caused the interrupt.
-		//Service the interrupt
-		//Clear the interrupt flag
-		//Etc.
-        #if defined(USB_INTERRUPT)
-
-	        USBDeviceTasks();
-        #endif
-	}
-#endif
-
-
-
-
-/** DECLARATIONS ***************************************************/
-#if defined(__18CXX)
-    #pragma code
-#endif
-
-/******************************************************************************
- * Function:        void main(void)
- *
- * PreCondition:    None
- *
- * Input:           None
- *
- * Output:          None
- *
- * Side Effects:    None
- *
- * Overview:        Main program entry point.
- *
- * Note:            None
- *****************************************************************************/
-#if defined(__18CXX)
-void main(void)
-#else
+/**
+ * @brief The main function
+ * @retval None
+ */
 int main(void)
-#endif
 {   
     InitializeSystem();
 
@@ -512,197 +67,16 @@ int main(void)
             }
         #endif
         ProcessIO();        
-    }//end while
-}//end main
-
-
-/********************************************************************
- * Function:        static void InitializeSystem(void)
- *
- * PreCondition:    None
- *
- * Input:           None
- *
- * Output:          None
- *
- * Side Effects:    None
- *
- * Overview:        InitializeSystem is a centralize initialization
- *                  routine. All required USB initialization routines
- *                  are called from here.
- *
- *                  User application initialization routine should
- *                  also be called from here.                  
- *
- * Note:            None
- *******************************************************************/
-static void InitializeSystem(void)
-{
-#if defined(_PIC14E)
-        ANSELA = 0x00;
-        ANSELB = 0x00;
-        ANSELC = 0x00;
-        TRISA  = 0x00;
-        TRISB  = 0x00;
-        TRISC  = 0x00;
-        OSCTUNE = 0;
-#if defined (USE_INTERNAL_OSC)
-        OSCCON = 0x7C;   // PLL enabled, 3x, 16MHz internal osc, SCS external
-        OSCCONbits.SPLLMULT = 1;   // 1=3x, 0=4x
-        ACTCON = 0x90;   // Clock recovery on, Clock Recovery enabled; SOF packet
-#else
-        OSCCON = 0x3C;   // PLL enabled, 3x, 16MHz internal osc, SCS external
-        OSCCONbits.SPLLMULT = 0;   // 1=3x, 0=4x
-        ACTCON = 0x00;   // Clock recovery off, Clock Recovery enabled; SOF packet
-#endif
-#endif
-    #if (defined(__18CXX) & !defined(PIC18F87J50_PIM) & !defined(PIC18F97J94_FAMILY))
-        ADCON1 |= 0x0F;                 // Default all pins to digital
-    #elif defined(__C30__) || defined __XC16__
-    	#if defined(__PIC24FJ256DA210__) || defined(__PIC24FJ256GB210__)
-    		ANSA = 0x0000;
-    		ANSB = 0x0000;
-    		ANSC = 0x0000;
-    		ANSD = 0x0000;
-    		ANSE = 0x0000;
-    		ANSF = 0x0000;
-    		ANSG = 0x0000;
-        #elif defined(__dsPIC33EP512MU810__) || defined (__PIC24EP512GU810__)
-        	ANSELA = 0x0000;
-    		ANSELB = 0x0000;
-    		ANSELC = 0x0000;
-    		ANSELD = 0x0000;
-    		ANSELE = 0x0000;
-    		ANSELG = 0x0000;
-            
-            // The dsPIC33EP512MU810 features Peripheral Pin
-            // select. The following statements map UART2 to 
-            // device pins which would connect to the the 
-            // RX232 transciever on the Explorer 16 board.
-
-             RPINR19 = 0;
-             RPINR19 = 0x64;
-             RPOR9bits.RP101R = 0x3;
-
-        #else
-            AD1PCFGL = 0xFFFF;
-        #endif
-    #elif defined(__C32__)
-        AD1PCFG = 0xFFFF;
-    #endif
-
-    #if defined(PIC18F87J50_PIM) || defined(PIC18F46J50_PIM) || defined(PIC18F_STARTER_KIT_1) || defined(PIC18F47J53_PIM)
-	//On the PIC18F87J50 Family of USB microcontrollers, the PLL will not power up and be enabled
-	//by default, even if a PLL enabled oscillator configuration is selected (such as HS+PLL).
-	//This allows the device to power up at a lower initial operating frequency, which can be
-	//advantageous when powered from a source which is not gauranteed to be adequate for 48MHz
-	//operation.  On these devices, user firmware needs to manually set the OSCTUNE<PLLEN> bit to
-	//power up the PLL.
-    {
-        unsigned int pll_startup_counter = 600;
-        OSCTUNEbits.PLLEN = 1;  //Enable the PLL and wait 2+ms until the PLL locks before enabling USB module
-        while(pll_startup_counter--);
     }
-    //Device switches over automatically to PLL output after PLL is locked and ready.
-    #endif
+}
 
-    #if defined(PIC18F97J94_FAMILY)
-        //Configure I/O pins for digital input mode.
-        ANCON1 = 0xFF;
-        ANCON2 = 0xFF;
-        ANCON3 = 0xFF;
-        #if(USB_SPEED_OPTION == USB_FULL_SPEED)
-            //Enable INTOSC active clock tuning if full speed
-            ACTCON = 0x90; //Enable active clock self tuning for USB operation
-            while(OSCCON2bits.LOCK == 0);   //Make sure PLL is locked/frequency is compatible
-                                            //with USB operation (ex: if using two speed 
-                                            //startup or otherwise performing clock switching)
-        #endif
-    #endif
-    
-    #if defined(PIC18F45K50_FAMILY)
-        //Configure oscillator settings for clock settings compatible with USB 
-        //operation.  Note: Proper settings depends on USB speed (full or low).
-        #if(USB_SPEED_OPTION == USB_FULL_SPEED)
-            OSCTUNE = 0x80; //3X PLL ratio mode selected
-            OSCCON = 0x70;  //Switch to 16MHz HFINTOSC
-            OSCCON2 = 0x10; //Enable PLL, SOSC, PRI OSC drivers turned off
-            while(OSCCON2bits.PLLRDY != 1);   //Wait for PLL lock
-            *((unsigned char*)0xFB5) = 0x90;  //Enable active clock tuning for USB operation
-        #endif
-        //Configure all I/O pins for digital mode (except RA0/AN0 which has POT on demo board)
-        ANSELA = 0x01;
-        ANSELB = 0x00;
-        ANSELC = 0x00;
-        ANSELD = 0x00;
-        ANSELE = 0x00;
-    #endif
-    
-    #if defined(__32MX460F512L__)|| defined(__32MX795F512L__)
-    // Configure the PIC32 core for the best performance
-    // at the operating frequency. The operating frequency is already set to 
-    // 60MHz through Device Config Registers
-    SYSTEMConfigPerformance(60000000);
-	#endif
-
-    #if defined(__dsPIC33EP512MU810__) || defined (__PIC24EP512GU810__)
-
-    // Configure the device PLL to obtain 60 MIPS operation. The crystal
-    // frequency is 8MHz. Divide 8MHz by 2, multiply by 60 and divide by
-    // 2. This results in Fosc of 120MHz. The CPU clock frequency is
-    // Fcy = Fosc/2 = 60MHz. Wait for the Primary PLL to lock and then
-    // configure the auxilliary PLL to provide 48MHz needed for USB 
-    // Operation.
-
-	PLLFBD = 38;				/* M  = 60	*/
-	CLKDIVbits.PLLPOST = 0;		/* N1 = 2	*/
-	CLKDIVbits.PLLPRE = 0;		/* N2 = 2	*/
-	OSCTUN = 0;			
-
-    /*	Initiate Clock Switch to Primary
-     *	Oscillator with PLL (NOSC= 0x3)*/
-	
-    __builtin_write_OSCCONH(0x03);		
-	__builtin_write_OSCCONL(0x01);
-	
-	
-	while (OSCCONbits.COSC != 0x3);       
-
-    // Configuring the auxiliary PLL, since the primary
-    // oscillator provides the source clock to the auxiliary
-    // PLL, the auxiliary oscillator is disabled. Note that
-    // the AUX PLL is enabled. The input 8MHz clock is divided
-    // by 2, multiplied by 24 and then divided by 2. Wait till 
-    // the AUX PLL locks.
-
-    ACLKCON3 = 0x24C1;   
-    ACLKDIV3 = 0x7;
-    
-    
-    ACLKCON3bits.ENAPLL = 1;
-    while(ACLKCON3bits.APLLCK != 1); 
-
-    #endif
-
-    #if defined(PIC18F87J50_PIM)
-	//Configure all I/O pins to use digital input buffers.  The PIC18F87J50 Family devices
-	//use the ANCONx registers to control this, which is different from other devices which
-	//use the ADCON1 register for this purpose.
-    WDTCONbits.ADSHR = 1;			// Select alternate SFR location to access ANCONx registers
-    ANCON0 = 0xFF;                  // Default all pins to digital
-    ANCON1 = 0xFF;                  // Default all pins to digital
-    WDTCONbits.ADSHR = 0;			// Select normal SFR locations
-    #endif
-
-    #if defined(PIC18F46J50_PIM) || defined(PIC18F_STARTER_KIT_1) || defined(PIC18F47J53_PIM)
-	//Configure all I/O pins to use digital input buffers.  The PIC18F87J50 Family devices
-	//use the ANCONx registers to control this, which is different from other devices which
-	//use the ADCON1 register for this purpose.
-    ANCON0 = 0x7F;                  // All pins to digital (except AN7: temp sensor)
-    ANCON1 = 0xBF;                  // Default all pins to digital.  Bandgap on.
-
-    #endif
-    
+/**
+ * @brief InitializeSystem is a centralize initialization routine.
+ * All required USB initialization routines are called from here.
+ * @retval None
+ */
+static void InitializeSystem(void)
+{ 
    #if defined(PIC24FJ64GB004_PIM) || defined(PIC24FJ256DA210_DEV_BOARD)
 	//On the PIC24FJ64GB004 Family of USB microcontrollers, the PLL will not power up and be enabled
 	//by default, even if a PLL enabled oscillator configuration is selected (such as HS+PLL).
@@ -757,97 +131,42 @@ static void InitializeSystem(void)
     tris_self_power = INPUT_PIN;	// See HardwareProfile.h
     #endif
     
-    UserInit();
+    UserInit(); //Setup an user IO
 
     USBDeviceInit();	//usb_device.c.  Initializes USB module SFRs and firmware
     					//variables to known states.
-}//end InitializeSystem
+}
 
-
-
-/******************************************************************************
- * Function:        void UserInit(void)
- *
- * PreCondition:    None
- *
- * Input:           None
- *
- * Output:          None
- *
- * Side Effects:    None
- *
- * Overview:        This routine should take care of all of the demo code
- *                  initialization that is required.
- *
- * Note:            
- *
- *****************************************************************************/
+/**
+ * @brief A function that intializes the user system
+ * @retval None
+ */
 void UserInit(void)
 {
-    TRISBbits.TRISB3 = INPUT_PIN;   //Setup inputs
+    TRISAbits.TRISA1 = INPUT_PIN;   //Setup inputs
 
-    AD1PCFGLbits.PCFG5 = 1; //Select AN5 for ADC
-    UINT channel,config1,config2,config3,configport,configscan;
-
-    ConfigIntADC10(ADC_INT_DISABLE);
-
-    CloseADC10();
-
-    channel= ADC_CH0_POS_SAMPLEA_AN5;
-
-    SetChanADC10(channel);
-
-    config1 = ADC_MODULE_OFF | ADC_CLK_AUTO |ADC_AUTO_SAMPLING_ON ;
-    config2 = ADC_SCAN_ON | ADC_INTR_EACH_CONV | ADC_VREF_AVDD_AVSS ;
-    config3 = ADC_SAMPLE_TIME_17 | ADC_CONV_CLK_254Tcy;
-    configport = 0x0005;
-    configscan = ADC_SCAN_AN5 ;
-    OpenADC10(config1,config2,config3,configport,configscan);
     
     int i;
     for(i=0; i<64; i++)
     {
         USB_In_Buffer[i] = 0;
     }
-    
-}//end UserInit
+}
 
-/********************************************************************
- * Function:        void ProcessIO(void)
- *
- * PreCondition:    None
- *
- * Input:           None
- *
- * Output:          None
- *
- * Side Effects:    None
- *
- * Overview:        This function is a place holder for other user
- *                  routines. It is a mixture of both USB and
- *                  non-USB tasks.
- *
- * Note:            None
- *******************************************************************/
+/**
+ * @brief A function that parses the user I/O and interfaces with the USB USART
+ * @retval None
+ */
 void ProcessIO(void)
 {   
     BYTE numBytesRead;
     UINT ADCResult[16];
-    char value = 0;
-    int i = 0;
-    //USB_In_Buffer[1]= 't';
-    //USB_In_Buffer[2]= 'e';
-    EnableADC1;
+    useADC(ADCResult, 0);
 
-    for(i= 0; i<16; i++)
-    {
-       ConvertADC10();
-       while(BusySampADC1); /*wait till conversion complete*/
-       ADCResult[i] = ReadADC10(i);
-    }
-    CloseADC10();
+    sprintf(USB_In_Buffer, "%d\n\r", ADCResult[0]);
 
-    USB_In_Buffer[0] = (char)(ADCResult[0] + 48);
+    
+    
     // User Application USB tasks
     if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1))
     {
@@ -857,30 +176,81 @@ void ProcessIO(void)
     if(USBUSARTIsTxTrfReady())
     {
         numBytesRead = getsUSBUSART(USB_Out_Buffer,64);
-        //putUSBUSART(USB_In_Buffer,numBytesRead);
         putUSBUSART(USB_In_Buffer,64);
     }
     CDCTxService();
 }		//end ProcessIO
 
-/********************************************************************
- * Function:        void BlinkUSBStatus(void)
- *
- * PreCondition:    None
- *
- * Input:           None
- *
- * Output:          None
- *
- * Side Effects:    None
- *
- * Overview:        BlinkUSBStatus turns on and off LEDs 
- *                  corresponding to the USB device state.
- *
- * Note:            mLED macros can be found in HardwareProfile.h
- *                  USBDeviceState is declared and updated in
- *                  usb_device.c.
- *******************************************************************/
+/**
+ * @brief A function that busy waits while measuring the specified port
+ * @param buffer The buffer to be passed the ADC results, must be of size 16
+ * @param port The port number of the analogue port to be used.
+ */
+void useADC(UINT *buffer, UINT port)
+{
+   UINT8 i=0;
+   UINT channel,config1,config2,config3,configport,configscan;
+
+   CloseADC10();
+
+   switch(port)
+   {
+       case 0:
+           channel= ADC_CH0_POS_SAMPLEA_AN0;
+           configport = ENABLE_AN0_ANA;
+           configscan = ADC_SCAN_AN0 ;
+           break;
+       case 1:
+           channel= ADC_CH0_POS_SAMPLEA_AN1;
+           configport = ENABLE_AN1_ANA;
+           configscan = ADC_SCAN_AN1 ;
+           break;
+       case 2:
+           channel= ADC_CH0_POS_SAMPLEA_AN2;
+           configport = ENABLE_AN2_ANA;
+           configscan = ADC_SCAN_AN2 ;
+           break;
+       case 3:
+           channel= ADC_CH0_POS_SAMPLEA_AN3;
+           configport = ENABLE_AN3_ANA;
+           configscan = ADC_SCAN_AN3 ;
+           break;
+       case 4:
+           channel= ADC_CH0_POS_SAMPLEA_AN4;
+           configport = ENABLE_AN4_ANA;
+           configscan = ADC_SCAN_AN4 ;
+           break;
+       case 5:
+           channel= ADC_CH0_POS_SAMPLEA_AN5;
+           configport = ENABLE_AN5_ANA;
+           configscan = ADC_SCAN_AN5 ;
+           break;
+       default:
+           channel= ADC_CH0_POS_SAMPLEA_AN0;
+           configport = ENABLE_AN0_ANA;
+           configscan = ADC_SCAN_AN0 ;
+           break;
+   }
+
+   /*Configure adc*/
+   config1 = ADC_MODULE_ON | ADC_IDLE_STOP | ADC_FORMAT_INTG | ADC_CLK_AUTO | ADC_AUTO_SAMPLING_ON ;
+   config2 = ADC_SCAN_ON | ADC_INTR_16_CONV | ADC_VREF_AVDD_AVSS | ADC_ALT_BUF_OFF | ADC_ALT_INPUT_OFF;
+   config3 = ADC_CONV_CLK_INTERNAL_RC| ADC_SAMPLE_TIME_31 | ADC_CONV_CLK_254Tcy;
+
+   SetChanADC10(channel);
+   OpenADC10(config1,config2,config3,configport,configscan);
+   
+   while(i < 16)
+   {
+       ConvertADC10();
+       while(BusySampADC1); /*wait till conversion complete*/
+       buffer[i] = ReadADC10(i);
+       i++;
+   }
+
+   CloseADC10();
+
+}
 
 // ******************************************************************************************************
 // ************** USB Callback Functions ****************************************************************
