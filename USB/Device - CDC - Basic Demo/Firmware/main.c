@@ -38,9 +38,8 @@
     #error No hardware board defined, see "HardwareProfile.h" and __FILE__
 #endif
 /** Global Variables ********************************************************/
-char USB_In_Buffer[64];
-char USB_Out_Buffer[64];
-struct rotaryHardwareState encoder1;
+char USB_In_Buffer[64]; /**<A buffer for the outgoing serial data*/
+char USB_Out_Buffer[64]; /**<A buffer for the incoming serial data*/
 /** P R I V A T E  P R O T O T Y P E S ***************************************/
 static void InitializeSystem(void);
 void ProcessIO(void);
@@ -145,20 +144,11 @@ static void InitializeSystem(void)
  */
 void UserInit(void)
 {
-    TRISBbits.TRISB7 = INPUT_PIN;
-    TRISBbits.TRISB8 = INPUT_PIN;
-    TRISBbits.TRISB9 = INPUT_PIN;
-
-    CNPU2bits.CN21PUE = 1;
-    CNPU2bits.CN22PUE = 1;
-    CNPU2bits.CN23PUE = 1;
-    
     int i;
     for(i=0; i<64; i++)
     {
         USB_In_Buffer[i] = 0;
     }
-    initRotaryStruct(&encoder1);
 }
 
 /**
@@ -198,18 +188,7 @@ void initADC(UINT port)
 void ProcessIO(void)
 {   
     BYTE numBytesRead;
-    UINT ADCResult[16];
-
-    #if !DEBUG
-    useADC(ADCResult, 0);
-
-    sprintf(USB_In_Buffer, "%d\n\r", ADCResult[0]);
-    #endif
-
-    #if DEBUG
-    readRotary(&encoder1);
-    sprintf(USB_In_Buffer, "%d\n\r", encoder1.direction);
-    #endif
+    
     // User Application USB tasks
     if((USBDeviceState < CONFIGURED_STATE)||(USBSuspendControl==1))
     {
